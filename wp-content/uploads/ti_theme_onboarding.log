@@ -1,0 +1,20 @@
+[26/Feb/2023:07:31:59] (I): WordPress Instance Info:
+[26/Feb/2023:07:31:59] (I): Home URL : https://thermoco2well.azurewebsites.net
+[26/Feb/2023:07:31:59] (I): Site URL : https://thermoco2well.azurewebsites.net
+[26/Feb/2023:07:31:59] (I): WordPress Version : 6.1
+[26/Feb/2023:07:31:59] (I): Onboarding Version : 1.1.34
+[26/Feb/2023:07:31:59] (I): Multisite : No
+[26/Feb/2023:07:31:59] (I): Server Info : nginx/1.20.2
+[26/Feb/2023:07:31:59] (I): PHP Version : 8.0.25
+[26/Feb/2023:07:31:59] (I): HTTPS : Yes
+[26/Feb/2023:07:31:59] (I): PHP Max Execution Time : 120
+[26/Feb/2023:07:31:59] (I): PHP Max Input Vars : 10000
+[26/Feb/2023:07:31:59] (I): Max Upload Size : 52428800
+[26/Feb/2023:07:31:59] (I): Plugins:
+[26/Feb/2023:07:31:59] (I): [PLUGIN] Otter – Page Builder Blocks &amp; Extensions for Gutenberg : v2.2.2 (ThemeIsle)
+[26/Feb/2023:07:31:59] (I): [PLUGIN] Templates Patterns Collection : v1.1.34 (ThemeIsle)
+[26/Feb/2023:07:31:59] (I): [PLUGIN] W3 Total Cache : v2.2.7 (BoldGrid)
+[26/Feb/2023:07:31:59] (I): [PLUGIN] Smush : v3.12.4 (WPMU DEV)
+[26/Feb/2023:07:31:59] (P): Installing optimole-wp.
+[26/Feb/2023:07:32:11] (P): Activating optimole-wp.
+[26/Feb/2023:07:32:15] (S): Installed and activated plugins.
