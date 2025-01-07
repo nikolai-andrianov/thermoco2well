@@ -1,0 +1,10 @@
+In C:\GEUS\Projects\THERMOCO2WELL\Website\Dash Linux shell: (the toke is saved in ~/githib_token_7.1.2025)
+	git clone https://nikolai-andrianov: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@github.com/nikolai-andrianov/thermoco2well.git
+	
+Create new files in C:\GEUS\Projects\THERMOCO2WELL\Website\Dash\thermoco2well
+
+Update the files on github.com: in C:\GEUS\Projects\THERMOCO2WELL\Website\Dash\thermoco2well
+	git add .
+	git commit -m "Initial commit"
+	git push -u origin main
+	
