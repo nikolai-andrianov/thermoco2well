@@ -16,12 +16,6 @@ elif platform.system() == 'Windows':
 else:
     raise Exception
       
-# Read the text sections
-about = ''
-with open(os.path.join(folder, 'pages/about.md'), 'r') as file:
-   about = file.read()
-   
-
 # Initialize the app - incorporate a Dash Bootstrap theme
 # Use the dash pages functionality
 external_stylesheets = [dbc.themes.CERULEAN, dbc.icons.FONT_AWESOME]
@@ -33,8 +27,12 @@ app.title = "THERMOCO2WELL"
 
 # Items for the navigation bar
 nav_project = dbc.NavItem(dbc.NavLink("Project", href="/project", active="exact"),)
-nav_about = dbc.NavItem(dbc.NavLink("About", href="/about", active="exact"),)
 nav_blog = dbc.NavItem(dbc.NavLink("Blog", href="/blog", active="exact"),)
+nav_about = dbc.NavItem(dbc.NavLink("About", href="/about", active="exact"),)
+nav_login = dbc.NavItem(dbc.NavLink("Sign in", href="/login", active="exact", 
+                                    style={"border":"2px grey solid", 'borderRadius': '5px'}
+                                    ),
+                       )
 
 navbar = dbc.Navbar(
     dbc.Container(
@@ -54,7 +52,7 @@ navbar = dbc.Navbar(
             dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
             dbc.Collapse(
                 dbc.Nav(
-                    [nav_project, nav_blog, nav_about],
+                    [nav_project, nav_blog, nav_about, nav_login],
                     className="ms-auto",    # Decrease the space between logo and NavbarBrand
                     navbar=True,
                 ),
@@ -64,9 +62,9 @@ navbar = dbc.Navbar(
         ],
         fluid=True,
     ),
-    #color="dark",
-    #dark=True,
+    id="navbar", 
     className="mb-0",   # Space between the navbar and the content
+    style={'display': 'block'},
 )
 
 # Define the project page
@@ -91,6 +89,14 @@ blog = dbc.Row([
         class_name='g-3'
 )
 
+# Read the contents of the About section
+about = ''
+with open(os.path.join(folder, 'pages/about.md'), 'r') as file:
+   about = file.read()
+
+# Define the login and signup pages
+from pages.login.layout import *
+
 # Padding to match the one in the navbar
 CONTENT_STYLE = {
     #"margin-left": "1rem",
@@ -98,12 +104,23 @@ CONTENT_STYLE = {
     "padding": "0.8rem 0.8rem",
 }
 
+# Initialize the store with the folder and empty user data
+data = {
+    'folder': folder,
+    'logged_in': False, 
+    'username': ''
+}
+
 # Display the pages in the content div
 content = html.Div(dash.page_container, id="page-content", style=CONTENT_STYLE)
 
-app.layout = html.Div(
-    [dcc.Location(id="url"), navbar, content]
-)
+# The layout consists of the navigation bar at the top, and the pages' content below 
+app.layout = html.Div([
+    dcc.Store(id='user-store', data=data),
+    dcc.Location(id="url"), 
+    navbar, 
+    content
+])
 
 # we use a callback to toggle the collapse on small screens
 def toggle_navbar_collapse(n, is_open):
@@ -118,21 +135,34 @@ app.callback(
 )(toggle_navbar_collapse)
 
 
-@app.callback(Output("page-content", "children"), [Input("url", "pathname")])
+@app.callback(
+    Output("navbar", "style"), 
+    Output("page-content", "children"), 
+    Input("url", "pathname")
+)
 def render_page_content(pathname):
 
+    # Shorthands to define the visibility of the navbar
+    navbar_visible = {'display': 'block'}
+    navbar_non_visible = {'display': 'none'}    
+
     if pathname == "/":
-        return blog
+        return navbar_visible, blog
     elif pathname == "/project":
-        return project    
+        return navbar_visible, project    
     elif pathname == "/blog":
-        return blog    
+        return navbar_visible, blog    
     elif "blog/" in pathname:
-        return article_pages[pathname]       
+        return navbar_visible, article_pages[pathname]       
     elif pathname == "/about":
-        return dcc.Markdown(about, dangerously_allow_html=True) # parameter needed to get the subscripts 
+        return navbar_visible, dcc.Markdown(about, dangerously_allow_html=True) # parameter needed to get the subscripts 
+    elif pathname == "/login":
+        return navbar_non_visible, login
+    elif pathname == "/signup":
+        return navbar_non_visible, signup        
+        
     # If the user tries to reach a different page, return a 404 message
-    return html.Div(
+    return navbar_visible, html.Div(
         [
             html.H1("404: Not found", className="text-danger"),
             html.Hr(),
