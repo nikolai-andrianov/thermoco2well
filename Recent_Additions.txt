@@ -1,0 +1,15 @@
+Recent changes
+
+18/03/2025
+
+- sign in and create acconut now have functionality
+- sign in now updates the navbar to show email of user logged in
+- when creating an account, a folder for that user is generated
+
+
+TO DO:
+
+- Forgot password currently links to plotly website -  needs to go to new page to send email to user
+- When a user successfully creates an account - should be automatically signed in
+- Currently, the user page automatically suggests invalid email or password message when navigated to.
+  This message should be suppressed.

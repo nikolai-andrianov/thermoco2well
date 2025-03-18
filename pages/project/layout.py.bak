@@ -34,8 +34,6 @@ input_filename = os.path.join(folder, "input.csv")
 default_data = pd.read_csv(default_input_filename)
 
 # Initialize the input file with default values
-# The trick is to define a dummy div with a callback, which is called just at page load, 
-# and copy the default input parameters to the ones, used in the simulation input inside of the callback.
 init = html.Div(id="init-div")
 @callback(
     Input("init-div", "id"),
@@ -45,10 +43,10 @@ def initialize(id):
 
 # Create a grid table with editable values of parameters
 grid = dag.AgGrid(
-    id = "input-grid",
-    rowData = default_data.to_dict("records"),
+    id="input-grid",
+    rowData=default_data.to_dict("records"),
     columnSize="autoSize",
-    columnDefs = [{"field": col, 'sortable': False, 'editable': True} if col == 'Value' 
+    columnDefs=[{"field": col, 'sortable': False, 'editable': True} if col == 'Value' 
                  else {"field": col, 'sortable': False} for col in default_data.columns if col != 'Variable'],
     style={"width": 700}
 )

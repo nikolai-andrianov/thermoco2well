@@ -1,12 +1,11 @@
 import dash
-from dash import Dash, dcc, html, Input, Output, State, callback
+from dash import Dash, dcc, html, Input, Output, callback
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import os, platform
 import pandas as pd
 import datetime
 from flask import request, copy_current_request_context
-
 
 # Need to specify the run folder for the production system
 if platform.system() == 'Linux':
@@ -15,7 +14,7 @@ elif platform.system() == 'Windows':
     folder = '.'
 else:
     raise Exception
-      
+
 # Initialize the app - incorporate a Dash Bootstrap theme
 # Use the dash pages functionality
 external_stylesheets = [dbc.themes.CERULEAN, dbc.icons.FONT_AWESOME]
@@ -25,47 +24,83 @@ app = Dash(__name__,
            suppress_callback_exceptions=True)
 app.title = "THERMOCO2WELL"
 
-# Items for the navigation bar
-nav_project = dbc.NavItem(dbc.NavLink("Project", href="/project", active="exact"),)
-nav_blog = dbc.NavItem(dbc.NavLink("Blog", href="/blog", active="exact"),)
-nav_about = dbc.NavItem(dbc.NavLink("About", href="/about", active="exact"),)
-nav_login = dbc.NavItem(dbc.NavLink("Sign in", href="/login", active="exact", 
-                                    style={"border":"2px grey solid", 'borderRadius': '5px'}
-                                    ),
-                       )
+# Initialize user data store
+data = {
+    'folder': folder,
+    'logged_in': False, 
+    'username': ''
+}
 
-navbar = dbc.Navbar(
-    dbc.Container(
-        [
-            html.A(
-                dbc.Row(
-                    [
-                        dbc.Col(html.Img(src=os.path.join(folder, '/assets/kirsch.png'), height="30px")),
-                        dbc.Col(dbc.NavbarBrand("THERMOCO2WELL", className="ms-2")),
-                    ],
+# Create the layout for the app
+app.layout = html.Div([
+    dcc.Store(id='user-store', data=data),  # Store for user data
+    dcc.Location(id="url"), 
+    html.Div(id="navbar"),  # Placeholder for the navbar
+    html.Div(id="page-content", style={"padding": "0.8rem 0.8rem"})  # Content area
+])
+
+# Function to create the navigation bar based on user login status
+def create_navbar(user_data):
+    nav_items = [
+        dbc.NavItem(dbc.NavLink("Project", href="/project", active="exact")),
+        dbc.NavItem(dbc.NavLink("Blog", href="/blog", active="exact")),
+        dbc.NavItem(dbc.NavLink("About", href="/about", active="exact")),
+    ]
+    
+    if user_data['logged_in']:
+        username = user_data['username']
+        nav_items.append(dbc.NavItem(
+            dbc.DropdownMenu(
+                children=[
+                    dbc.DropdownMenuItem("Logout", href="/login", style={"color": "red"}),
+                ],
+                nav=True,
+                in_navbar=True,
+                label=f"Logged in as: {username}",
+            )
+        ))
+    else:
+        nav_items.append(dbc.NavItem(dbc.NavLink("Sign in", href="/login", active="exact", 
+            style={"border": "2px grey solid", 'borderRadius': '5px'})))
+
+    return dbc.Navbar(
+        dbc.Container(
+            [
+                html.A(
+                    dbc.Row(
+                        [
+                            dbc.Col(html.Img(src=os.path.join(folder, '/assets/kirsch.png'), height="30px")),
+                            dbc.Col(dbc.NavbarBrand("THERMOCO2WELL", className="ms-2")),
+                        ],
                     #align='center',
-                    className="g-0",
+                        className="g-0",
+                    ),
+                    href="/",
+                    style={"textDecoration": "none"},
                 ),
-                href="/",
-                style={"textDecoration": "none"},
-            ),
-            dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
-            dbc.Collapse(
-                dbc.Nav(
-                    [nav_project, nav_blog, nav_about, nav_login],
-                    className="ms-auto",    # Decrease the space between logo and NavbarBrand
+                dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
+                dbc.Collapse(
+                    dbc.Nav(nav_items, className="ms-auto", navbar=True),
+                    id="navbar-collapse",
                     navbar=True,
                 ),
-                id="navbar-collapse",
-                navbar=True,
-            ),
-        ],
-        fluid=True,
-    ),
-    id="navbar", 
-    className="mb-0",   # Space between the navbar and the content
-    style={'display': 'block'},
+            ],
+            fluid=True,
+        ),
+        id="navbar", 
+        className="mb-0"
+    )
+
+# Update the navbar based on user being logged in or not
+@app.callback(
+    Output('navbar', 'children'),
+    Input('user-store', 'data'),
 )
+def update_navbar(user_data):
+    # Handle case when user_data is None
+    if user_data is None:
+        user_data = {'logged_in': False, 'username': ''}  # Default values
+    return create_navbar(user_data)
 
 # Define the project page
 from pages.project.layout import tab_input, tab_results
@@ -80,14 +115,8 @@ project = dbc.Tabs(
 from pages.blog.layout import article_cards, article_pages
 
 blog = dbc.Row([
-        dbc.Col(
-            item,
-            md=4,
-            align='stretch'
-        ) for item in article_cards
-        ],
-        class_name='g-3'
-)
+    dbc.Col(item, md=4, align='stretch') for item in article_cards
+], className='g-3')
 
 # Read the contents of the About section
 about = ''
@@ -97,72 +126,34 @@ with open(os.path.join(folder, 'pages/about.md'), 'r') as file:
 # Define the login and signup pages
 from pages.login.layout import *
 
-# Padding to match the one in the navbar
-CONTENT_STYLE = {
-    #"margin-left": "1rem",
-    #"margin-right": "1rem",
-    "padding": "0.8rem 0.8rem",
-}
-
-# Initialize the store with the folder and empty user data
-data = {
-    'folder': folder,
-    'logged_in': False, 
-    'username': ''
-}
-
-# Display the pages in the content div
-content = html.Div(dash.page_container, id="page-content", style=CONTENT_STYLE)
-
-# The layout consists of the navigation bar at the top, and the pages' content below 
-app.layout = html.Div([
-    dcc.Store(id='user-store', data=data),
-    dcc.Location(id="url"), 
-    navbar, 
-    content
-])
-
-# we use a callback to toggle the collapse on small screens
-def toggle_navbar_collapse(n, is_open):
-    if n:
-        return not is_open
-    return is_open
-
-app.callback(
-    Output(f"navbar-collapse", "is_open"),
-    [Input(f"navbar-toggler", "n_clicks")],
-    [State(f"navbar-collapse", "is_open")],
-)(toggle_navbar_collapse)
-
-
+# Callback to render the page content based on URL
 @app.callback(
-    Output("navbar", "style"), 
     Output("page-content", "children"), 
-    Input("url", "pathname")
+    Input("url", "pathname"),
+    Input('user-store', 'data')  # Add user data as input
 )
-def render_page_content(pathname):
-
-    # Shorthands to define the visibility of the navbar
+def render_page_content(pathname, user_data):
     navbar_visible = {'display': 'block'}
     navbar_non_visible = {'display': 'none'}    
 
     if pathname == "/":
-        return navbar_visible, blog
+        return blog
     elif pathname == "/project":
-        return navbar_visible, project    
+        return project    
     elif pathname == "/blog":
-        return navbar_visible, blog    
+        return blog    
     elif "blog/" in pathname:
-        return navbar_visible, article_pages[pathname]       
+        return article_pages[pathname]       
     elif pathname == "/about":
-        return navbar_visible, dcc.Markdown(about, dangerously_allow_html=True) # parameter needed to get the subscripts 
+        return dcc.Markdown(about, dangerously_allow_html=True)
+    # Navbar made visible upon logging in and signing up
     elif pathname == "/login":
-        return navbar_non_visible, login
+        return login  # Login page
     elif pathname == "/signup":
-        return navbar_non_visible, signup        
+        return signup  # Signup page
         
     # If the user tries to reach a different page, return a 404 message
-    return navbar_visible, html.Div(
+    return html.Div(
         [
             html.H1("404: Not found", className="text-danger"),
             html.Hr(),
@@ -174,7 +165,7 @@ def render_page_content(pathname):
 # server is referred to in app.wsgi    
 server = app.server
 
-
+# Callback to log user access data
 @app.callback(Input('url', 'href'))
 def display_page(href):
     if href is None:
@@ -190,8 +181,7 @@ def display_page(href):
         df.to_csv(fname, mode='a', index=False, header=False)
     else:
         df.to_csv(fname, mode='a', index=False, header=True)
-        
- 
 
+# Run the server
 if __name__ == '__main__':
     app.run(debug=True)
