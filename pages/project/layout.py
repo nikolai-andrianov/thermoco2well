@@ -20,13 +20,15 @@ if 'REDIS_URL' in os.environ:
     from celery import Celery
     celery_app = Celery(__name__, broker=os.environ['REDIS_URL'], backend=os.environ['REDIS_URL'])
     background_callback_manager = CeleryManager(celery_app)
+
 else:
     # Diskcache for non-production apps when developing locally
     import diskcache
     cache = diskcache.Cache(os.path.join(folder, "cache"))
     background_callback_manager = DiskcacheManager(cache)
+  
 
-# The default input data is unchanged, input data can be changed by the user
+# The defalt input data is unchanged, input data can be changed by the user
 default_input_filename = os.path.join(folder, "input_default.csv")
 input_filename = os.path.join(folder, "input.csv")
 
@@ -43,13 +45,14 @@ init = html.Div(id="init-div")
 def initialize(id):
     shutil.copyfile(default_input_filename, input_filename)
 
+
 # Create a grid table with editable values of parameters
 grid = dag.AgGrid(
     id = "input-grid",
     rowData = default_data.to_dict("records"),
     columnSize="autoSize",
     columnDefs = [{"field": col, 'sortable': False, 'editable': True} if col == 'Value' 
-                 else {"field": col, 'sortable': False} for col in default_data.columns if col != 'Variable'],
+                  else {"field": col, 'sortable': False} for col in default_data.columns if col != 'Variable'],
     style={"width": 700}
 )
 
@@ -61,28 +64,26 @@ buttons = html.Div(
         dbc.Tooltip('Run simulation using saved input parameters', target='run-button'),
         dbc.Button("Load defaults", id="load-button", color="info", className="me-1", n_clicks=0),   
         dbc.Tooltip('Load default input parameters', target='load-button'),  
-        dbc.Alert("Modified input parameters saved", id="save-button-alert", is_open=False, dismissable=True),    
-        dbc.Alert('Simulation results are available in the Results tab', id="run-button-alert", is_open=False, dismissable=True),          
+        dbc.Alert(
+            #"Modified input parameters saved in " + input_filename,
+            "Modified input parameters saved",
+            id="save-button-alert",
+            is_open=False,
+            dismissable=True,
+            # duration=2000,
+        ),    
+        dbc.Alert(
+            'Simulation results are available in the Results tab',
+            id="run-button-alert",
+            is_open=False,
+            dismissable=True,
+        ),          
     ]
 )
-
-# Dropdown for My Projects
-my_projects_dropdown = dcc.Dropdown(
-    id='my-projects-dropdown',
-    options=[],  # Will be populated based on user directory
-    placeholder="Select a project folder",
-)
-
-# My Projects Button
-my_projects_button = dbc.Button("My Projects", id="my-projects-button", color="primary", className="me-1", n_clicks=0)
 
 # The tab with input data and buttons
 tab_input = dbc.Container(
     [
-        dbc.Row([
-            dbc.Col(my_projects_button, width="auto"),
-            dbc.Col(my_projects_dropdown, width="auto"),  # Include dropdown next to button
-        ]),
         dbc.Row(grid),   
         html.Hr(),
         dbc.Row(buttons),
@@ -97,6 +98,7 @@ tab_input = dbc.Container(
 )
 
 # The results tab is initially disabled
+#disabled_results = True
 tab_results = dbc.Container(
     [
         html.Div(id="results_div"),
@@ -104,22 +106,9 @@ tab_results = dbc.Container(
     fluid=True
 )
 
-# Callback to manage the visibility of the My Projects button and dropdown based on user login status
-@callback(
-    Output("my-projects-button", "style"),
-    Output("my-projects-dropdown", "options"),
-    Input('user-store', 'data')  # Access user data from the store
-)
-def display_my_projects_button(user_data):
-    if user_data and user_data['logged_in']:
-        # Assume user's project folders are in a specific directory
-        user_folder = os.path.join(folder, 'user_projects', user_data['username'])
-        if os.path.exists(user_folder):
-            project_folders = [{'label': folder, 'value': folder} for folder in os.listdir(user_folder)]
-            return {'display': 'inline-block'}, project_folders  # Show the button and populate dropdown
-    return {'display': 'none'}, []  # Hide the button and clear dropdown if not logged in
-
 # If some value(s) are changed in the input table, activate Save button and deactivate Run button.
+# Make sure that nothing is updated if nothing is changed in the table.
+# Need to use allow_duplicate=True and prevent_initial_call=True to enable status change from the 2 callbacks
 @callback(
     Output("save-button", "disabled", allow_duplicate=True), 
     Output("run-button", "disabled", allow_duplicate=True), 
@@ -131,6 +120,7 @@ def on_modified_input(cell_changed):
         raise PreventUpdate
     return False, True
 
+
 # Callback for the Save button: save the modified input data to input.csv, disable the Save button, and enable the Run button
 @callback(Output("save-button-alert", "is_open"), Output("save-button", "disabled"), Output("run-button", "disabled"),
     Input("input-grid", "rowData"), Input("save-button", "n_clicks"),
@@ -138,11 +128,21 @@ def on_modified_input(cell_changed):
     prevent_initial_call=True
 )
 def on_save_button_click(data, n, is_open):
+
     if n is not None:
+    
+        # Convert the dict with the modified input to a dataframe
         updated_input = pd.DataFrame.from_dict(data)
+
+        # Save the updated input to CSV
         updated_input.to_csv(input_filename, index=False) 
+
+        # This prints the dict of modified input in the field (add Output("editing-grid-output", "children"))
+        # return f"{data}"
+
         return not is_open, True, False        
-    return is_open        
+    #return is_open        
+
 
 # Callback for the Load defaults button: save the modified input data to input.csv, disable the Save button, and enable the Run button
 @callback(
@@ -155,6 +155,7 @@ def on_save_button_click(data, n, is_open):
 def on_load_button_click(n):
     if n is not None:   
         return default_data.to_dict("records"), True, False        
+
 
 # Callback for the Run button
 @callback(
@@ -187,17 +188,28 @@ def on_load_button_click(n):
     ],
 )
 def on_run_button_click(set_progress, n, is_open):
+
+    # Tota number of steps in the progress bar
     total = 3
+    
     if n is not None:   
+    
+        # Step #1: update the Output in the progress decorator
         set_progress((str(1), str(total), 'Running simulation..'))
+
+        # Run the simulation
         run_backend(folder)
+        
+        # Step #2
         set_progress((str(2), str(total), 'Creating plots..'))
         
+        # Read the results and remove units fom column names
         data = pd.read_csv(os.path.join(folder, "results.csv"))
         cols_units = data.columns.to_list()
         cols = [c.split()[0] for c in cols_units]
         data.rename(columns=dict(zip(cols_units, cols)), inplace=True)
         
+        # Graphs with simulation results
         graphs = html.Div([
                 dcc.Graph(
                     id='pressure',
@@ -209,6 +221,7 @@ def on_run_button_click(set_progress, n, is_open):
                             }
                         ],
                         "layout": {
+                            #'title': 'Basic Dash Example',
                             "xaxis": {"title": cols_units[1]},
                             "yaxis": {"title": cols_units[0], 'autorange': "reversed"},
                         },
@@ -225,6 +238,7 @@ def on_run_button_click(set_progress, n, is_open):
                             }
                         ],
                         "layout": {
+                            #'title': 'Basic Dash Example',
                             "xaxis": {"title": cols_units[2]},
                             "yaxis": {"title": cols_units[0], 'autorange': "reversed"},
                         },
@@ -233,10 +247,16 @@ def on_run_button_click(set_progress, n, is_open):
                 )]
         )      
 
+        # This updates the Output in the progress decorator
         set_progress((str(3), str(total), 'Done!'))        
+    
+        # Return graphs, show the alert, and activate the Results tab        
         return graphs, not is_open, False        
 
+
+
 layout = html.Div()
+
 
 dash.register_page(
     __name__,
