@@ -204,7 +204,7 @@ def login_user(email, password, n_clicks):
     msg_password = ''
 
     # Logic to verify the user credentials
-    DB_PATH = os.path.join('pages/accounts/users.db')
+    DB_PATH = os.path.join(user_store['folder'], 'pages/accounts/users.db')
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT password FROM users WHERE username = ?', (email,))
