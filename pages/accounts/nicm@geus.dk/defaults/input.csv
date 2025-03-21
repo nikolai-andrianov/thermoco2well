@@ -1,0 +1,24 @@
+Property,Variable,Value,Unit
+Well measured depth,D,2000,m
+Inclination from horizontal,phi,270,deg
+Tubing inner radius,r_ti,3.1,cm
+Tubing outer radius,r_to,3.65,cm
+Casing inner radius,r_ci,6.21,cm
+Casing outer radius,r_co,6.98,cm
+Wellbore radius,r_wb,10.79,cm
+Tubing thermal conductivity,k_t,15,W/(m*degC)
+Casing thermal conductivity,k_c,15,W/(m*degC)
+Cement thermal conductivity,k_cem,6.9,W/(m*degC)
+Formation thermal conductivity,k_e,2.4,W/(m*degC)
+Formation density,rho_e,2375,kg/m3
+Formation specific heat capacity,cp_e,939,J/(kg*degC)
+Geothermal gradient,dTgeo,25,degC/km
+CO2 density,,Span-Wagner EoS,
+CO2 viscosity,,Laesecke and Muzny (2017),
+Annulus fluid density,rho_a,995.98,kg/m3
+Annulus fluid viscosity,mu_a,1.5,cP
+Annulus fluid specific heat capacity,cp_a,3964.89,J/(kg*degC)
+Annulus fluid thermal conductivity,k_a,0.66,W/(m*degC)
+Top boundary pressure,P,80,bar
+Top boundary temperature,T,40,degC
+CO2 mass flow rate,Qm,0.5,Mta

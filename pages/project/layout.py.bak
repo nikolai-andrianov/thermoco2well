@@ -1,0 +1,242 @@
+import dash
+from dash import html, Input, Output, State, callback, dcc, DiskcacheManager, CeleryManager
+import dash_ag_grid as dag
+import dash_bootstrap_components as dbc
+from dash.exceptions import PreventUpdate
+import os, platform, shutil
+import pandas as pd
+from .backend.backend import run_backend
+
+# Need to specify the run folder for the production system
+if platform.system() == 'Linux':
+    folder = '/var/www/FlaskDash/pages/project/backend'
+elif platform.system() == 'Windows':
+    folder = './pages/project/backend'
+else:
+    raise Exception
+    
+if 'REDIS_URL' in os.environ:
+    # Use Redis & Celery if REDIS_URL set as an env variable
+    from celery import Celery
+    celery_app = Celery(__name__, broker=os.environ['REDIS_URL'], backend=os.environ['REDIS_URL'])
+    background_callback_manager = CeleryManager(celery_app)
+else:
+    # Diskcache for non-production apps when developing locally
+    import diskcache
+    cache = diskcache.Cache(os.path.join(folder, "cache"))
+    background_callback_manager = DiskcacheManager(cache)
+
+# The default input data is unchanged, input data can be changed by the user
+default_input_filename = os.path.join(folder, "input_default.csv")
+input_filename = os.path.join(folder, "input.csv")
+
+# Import the default input data
+default_data = pd.read_csv(default_input_filename)
+
+# Initialize the input file with default values
+init = html.Div(id="init-div")
+@callback(
+    Input("init-div", "id"),
+)
+def initialize(id):
+    shutil.copyfile(default_input_filename, input_filename)
+
+# Create a grid table with editable values of parameters
+grid = dag.AgGrid(
+    id="input-grid",
+    rowData=default_data.to_dict("records"),
+    columnSize="autoSize",
+    columnDefs=[{"field": col, 'sortable': False, 'editable': True} if col == 'Value' 
+                 else {"field": col, 'sortable': False} for col in default_data.columns if col != 'Variable'],
+    style={"width": 700}
+)
+
+buttons = html.Div(
+    [
+        dbc.Button("Save", id="save-button", color="secondary", className="me-1", n_clicks=0, disabled=True),  
+        dbc.Tooltip('Save modified input parameters', target='save-button'),
+        dbc.Button("Run", id="run-button", color="primary", className="me-1", n_clicks=0, disabled=False),   
+        dbc.Tooltip('Run simulation using saved input parameters', target='run-button'),
+        dbc.Button("Load defaults", id="load-button", color="info", className="me-1", n_clicks=0),   
+        dbc.Tooltip('Load default input parameters', target='load-button'),  
+        dbc.Alert("Modified input parameters saved", id="save-button-alert", is_open=False, dismissable=True),    
+        dbc.Alert('Simulation results are available in the Results tab', id="run-button-alert", is_open=False, dismissable=True),          
+    ]
+)
+
+# Dropdown for My Projects
+my_projects_dropdown = dcc.Dropdown(
+    id='my-projects-dropdown',
+    options=[],  # Will be populated based on user directory
+    placeholder="Select a project folder",
+)
+
+# My Projects Button
+my_projects_button = dbc.Button("My Projects", id="my-projects-button", color="primary", className="me-1", n_clicks=0)
+
+# The tab with input data and buttons
+tab_input = dbc.Container(
+    [
+        dbc.Row([
+            dbc.Col(my_projects_button, width="auto"),
+            dbc.Col(my_projects_dropdown, width="auto"),  # Include dropdown next to button
+        ]),
+        dbc.Row(grid),   
+        html.Hr(),
+        dbc.Row(buttons),
+        html.Hr(),
+        html.Span([
+            html.Progress(id="progress_bar", style={"visibility": "hidden"}),
+            html.Span(id='progress_status', children='Loading data..', style={"visibility": "hidden", "marginLeft": "15px"}),       # hidden
+        ]),
+        html.Div(id="editing-grid-output"),
+    ],     
+    fluid=True
+)
+
+# The results tab is initially disabled
+tab_results = dbc.Container(
+    [
+        html.Div(id="results_div"),
+    ],     
+    fluid=True
+)
+
+# Callback to manage the visibility of the My Projects button and dropdown based on user login status
+@callback(
+    Output("my-projects-button", "style"),
+    Output("my-projects-dropdown", "options"),
+    Input('user-store', 'data')  # Access user data from the store
+)
+def display_my_projects_button(user_data):
+    if user_data and user_data['logged_in']:
+        # Assume user's project folders are in a specific directory
+        user_folder = os.path.join(folder, 'user_projects', user_data['username'])
+        if os.path.exists(user_folder):
+            project_folders = [{'label': folder, 'value': folder} for folder in os.listdir(user_folder)]
+            return {'display': 'inline-block'}, project_folders  # Show the button and populate dropdown
+    return {'display': 'none'}, []  # Hide the button and clear dropdown if not logged in
+
+# If some value(s) are changed in the input table, activate Save button and deactivate Run button.
+@callback(
+    Output("save-button", "disabled", allow_duplicate=True), 
+    Output("run-button", "disabled", allow_duplicate=True), 
+    Input("input-grid", "cellValueChanged"),
+    prevent_initial_call=True
+)
+def on_modified_input(cell_changed):
+    if cell_changed is None:
+        raise PreventUpdate
+    return False, True
+
+# Callback for the Save button: save the modified input data to input.csv, disable the Save button, and enable the Run button
+@callback(Output("save-button-alert", "is_open"), Output("save-button", "disabled"), Output("run-button", "disabled"),
+    Input("input-grid", "rowData"), Input("save-button", "n_clicks"),
+    State("save-button-alert", "is_open"),
+    prevent_initial_call=True
+)
+def on_save_button_click(data, n, is_open):
+    if n is not None:
+        updated_input = pd.DataFrame.from_dict(data)
+        updated_input.to_csv(input_filename, index=False) 
+        return not is_open, True, False        
+    return is_open        
+
+# Callback for the Load defaults button: save the modified input data to input.csv, disable the Save button, and enable the Run button
+@callback(
+    Output("input-grid", "rowData", allow_duplicate=True), 
+    Output("save-button", "disabled", allow_duplicate=True), 
+    Output("run-button", "disabled", allow_duplicate=True),
+    Input("load-button", "n_clicks"),
+    prevent_initial_call=True
+)
+def on_load_button_click(n):
+    if n is not None:   
+        return default_data.to_dict("records"), True, False        
+
+# Callback for the Run button
+@callback(
+    Output("id_tab_results", "children"),
+    Output("run-button-alert", "is_open"),
+    Output("id_tab_results", "disabled"), 
+    Input("run-button", "n_clicks"),
+    State("run-button-alert", "is_open"),
+    background=True,
+    manager=background_callback_manager,    
+    prevent_initial_call=True,
+    running=[
+        (Output("run-button", "disabled"), True, False), 
+        (Output("load-button", "disabled"), True, False),
+        (
+            Output("progress_bar", "style"),
+            {"visibility": "visible"},
+            {"visibility": "hidden"},
+        ),
+        (
+            Output("progress_status", "style"),
+            {"visibility": "visible", "marginLeft": "15px"},
+            {"visibility": "hidden", "marginLeft": "15px"},
+        ),        
+    ],
+    progress=[
+        Output("progress_bar", "value"), 
+        Output("progress_bar", "max"), 
+        Output("progress_status", "children"),
+    ],
+)
+def on_run_button_click(set_progress, n, is_open):
+    total = 3
+    if n is not None:   
+        set_progress((str(1), str(total), 'Running simulation..'))
+        run_backend(folder)
+        set_progress((str(2), str(total), 'Creating plots..'))
+        
+        data = pd.read_csv(os.path.join(folder, "results.csv"))
+        cols_units = data.columns.to_list()
+        cols = [c.split()[0] for c in cols_units]
+        data.rename(columns=dict(zip(cols_units, cols)), inplace=True)
+        
+        graphs = html.Div([
+                dcc.Graph(
+                    id='pressure',
+                    figure={
+                        "data": [
+                            {
+                                "x": data["Pressure"],
+                                "y": data["MD"],
+                            }
+                        ],
+                        "layout": {
+                            "xaxis": {"title": cols_units[1]},
+                            "yaxis": {"title": cols_units[0], 'autorange': "reversed"},
+                        },
+                    },
+                    style={'display': 'inline-block'},
+                ),
+                dcc.Graph(
+                    id='temperature',
+                    figure={
+                        "data": [
+                            {
+                                "x": data["Temperature"],
+                                "y": data["MD"],
+                            }
+                        ],
+                        "layout": {
+                            "xaxis": {"title": cols_units[2]},
+                            "yaxis": {"title": cols_units[0], 'autorange': "reversed"},
+                        },
+                    },
+                    style={'display': 'inline-block'},
+                )]
+        )      
+
+        set_progress((str(3), str(total), 'Done!'))        
+        return graphs, not is_open, False        
+
+layout = html.Div()
+
+dash.register_page(
+    __name__,
+    path='/project',
+)
