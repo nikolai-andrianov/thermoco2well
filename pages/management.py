@@ -130,6 +130,7 @@ def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_p
                 ]),
                 style={"background-color": "white", "border": "1px solid black", "cursor": "pointer"},
             )
+
             project_cards.append(dbc.Col(project_card, width=4))
 
         rows = [dbc.Row(project_cards[i:i+3], className="mb-3") for i in range(0, len(project_cards), 3)]
@@ -148,31 +149,34 @@ def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_p
     # Handle Delete button clicks
     if "project-delete-button" in button_id:
         try:
-            # Correctly extract the project name from the button ID using the 'index' key, as we do for the "Open" button
-            project_name = ctx.triggered[0]["prop_id"].split(":")[1].strip('"')  # This correctly extracts the project name
+            # Fix: Extract the project name from the button ID, clean the string
+            # Instead of splitting incorrectly, we clean the string from any additional characters
+            project_to_delete = button_id.split(":")[1]  # Extract project name from button ID
+            project_name = project_to_delete.replace('","type', '').replace('"', '').strip()  # Remove any extraneous parts like ","type and quotes
 
-            # Ensure the project name is extracted from the right part of the button's ID
-            if isinstance(project_name, dict):
-                project_name = project_name.get('index')
-
+            # Construct the full path to the project folder
             project_path = os.path.join(user_folder, project_name)
 
-            # Check if the folder exists before attempting to delete
+            # Normalize the project path to ensure correct formatting of slashes
+            project_path = os.path.normpath(project_path)
+
+            # Debugging output
+            print(f"Attempting to delete project: {project_name} at {project_path}")
+
+            # Check if the project folder exists and delete it
             if os.path.exists(project_path):
                 shutil.rmtree(project_path)  # Delete the project folder and its contents
-                print(f"Project Deleted: {project_name} at {project_path}")
+                print(f"Successfully deleted project: {project_name} at {project_path}")
             else:
-                print(f"Project folder not found: {project_path}")
+                print(f"Project not found at {project_path}")
 
         except Exception as e:
-            print(f"Error while deleting project: {str(e)}")
+            print(f"Error during deletion: {e}")
 
         # Refresh the project list after deletion
         return dash.no_update, dash.no_update, dash.no_update
 
     return dash.no_update, dash.no_update, dash.no_update
-
-
 
 # Callback to handle "Open" button click and print project name and folder path in terminal
 @callback(
