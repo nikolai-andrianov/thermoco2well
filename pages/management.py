@@ -16,7 +16,7 @@ def get_logged_in_user(user_data):
 layout = html.Div([  
     # Store for the selected project name
     html.H1("Project Management", style={"color": "black"}),  # Changed title to "Project Management" with black color
-    html.P("Here you can manage your projects and other settings."),
+    html.P("Here you can manage your projects."),
 
     # Centered buttons for project management
     html.Div([
@@ -66,6 +66,8 @@ layout = html.Div([
 ])
 
 # Callback to manage project actions (add, see, delete)
+# Cards are generated for each project
+# Each card has open and delete buttons
 @callback(
     Output("projects-list", "children"),
     Output("new-project-modal", "is_open"),
@@ -73,7 +75,7 @@ layout = html.Div([
     Input("see-my-projects-button", "n_clicks"),
     Input("add-new-project-button", "n_clicks"),
     Input("confirm-new-project", "n_clicks"),
-    Input({"type": "project-delete-button", "index": dash.ALL}, "n_clicks"),  # Listen for delete button clicks
+    Input({"type": "project-delete-button", "index": dash.ALL}, "n_clicks"),
     State("new-project-name", "value"),
     State("new-project-modal", "is_open"),
     State("user-store", "data"),
@@ -150,7 +152,7 @@ def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_p
     if "project-delete-button" in button_id:
         try:
             # Fix: Extract the project name from the button ID, clean the string
-            # Instead of splitting incorrectly, we clean the string from any additional characters
+            # Instead of splitting incorrectly, clean the string from any additional characters
             project_to_delete = button_id.split(":")[1]  # Extract project name from button ID
             project_name = project_to_delete.replace('","type', '').replace('"', '').strip()  # Remove any extraneous parts like ","type and quotes
 
@@ -218,7 +220,7 @@ def handle_project_click(n_clicks, user_data):
             # Check if 'input.csv' exists in the project folder
             input_csv_path = os.path.join(project_path, 'input.csv')
 
-            # Normalize the input CSV path
+            # Normalize the input CSV path to get correct path displayed in terminal and correctly identify input.csv
             input_csv_path = os.path.normpath(input_csv_path)
 
             print(f"Looking for input.csv at: {input_csv_path}")  # Debugging
