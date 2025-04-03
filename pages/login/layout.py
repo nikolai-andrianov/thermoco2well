@@ -1,9 +1,12 @@
-from dash import html, Input, Output, State, callback, no_update  # Added no_update import
+from dash import html, Input, Output, State, callback, no_update, dcc
 import dash_bootstrap_components as dbc
 import os
 import sqlite3
 import bcrypt
 import shutil
+
+# Persistent storage for user session
+dcc.Store(id='user-store', storage_type='local')
 
 # Define the layout for the login page
 login = dbc.Container(
@@ -16,7 +19,7 @@ login = dbc.Container(
                     dbc.Label("Email", html_for="login-email"),
                     dbc.Input(type="email", id="login-email", required=True, autocomplete='email', className='mb-3'), 
                     dbc.Alert("", id='login-email-alert', is_open=False, color="danger"),
-                    dbc.Row([
+                    dbc.Row([ 
                         dbc.Col(dbc.Label("Password", html_for="login-password")),
                         dbc.Col(html.A("Forgot password?", href='https://plot.ly'), 
                                 style={'display': 'flex', 'justifyContent': 'right',}),
@@ -24,25 +27,35 @@ login = dbc.Container(
                     dbc.Input(type="password", id="login-password", required=True, autocomplete='current-password', className='mb-3'),
                     dbc.Alert("", id='login-password-alert', is_open=False, color="danger"),
                     dbc.Row(
-                        dbc.Button('Sign in', id='login-button',),  
-                    )                        
+                        dbc.Button('Sign in', id='login-button'),  
+                    )
                 ],
             ),
-            style={'width': '400px'},  # Set a specific width for the card
+            style={'width': '400px'},
             className='mb-3',
         ),
-        dbc.Row([
-            dbc.Col([
+        dbc.Row([ 
+            dbc.Col([ 
                 dbc.Label('No account?', style={"margin-right": "10px"}), 
-                html.A("Open one!", href='/signup')
-            ],
-            style={'display': 'flex', 'justifyContent': 'center',}), 
-        ],
-        style={'width': '400px',}
-        ),
+                html.A("Open one!", href='/signup') 
+            ], style={'display': 'flex', 'justifyContent': 'center',}), 
+        ], style={'width': '400px',}),
+        
+        # Placeholder for redirect link after login
+        dbc.Row([
+            html.Div(id='redirect-link', style={'textAlign': 'center'})  
+        ]),
+
+        # Add a "Proceed to Projects" button here, initially hidden
+        dbc.Row([
+            dbc.Col(
+                dbc.Button('Proceed to Projects', id='proceed-to-projects', color='primary', style={'display': 'none'}),
+                width={"size": 6, "offset": 3}
+            )
+        ])
     ],
     style={
-        'height': '80vh',  # Full viewport height
+        'height': '80vh',
         'display': 'flex',
         'justifyContent': 'center',
         'alignItems': 'center',
@@ -50,6 +63,7 @@ login = dbc.Container(
     },
     fluid=True,
 )
+
 
 # Define the layout for the signup page
 signup = dbc.Container(
@@ -75,7 +89,7 @@ signup = dbc.Container(
                     )                        
                 ],
             ),
-            style={'width': '400px'},  # Set a specific width for the card
+            style={'width': '400px'},  
             className='mb-3',
         ),
         dbc.Row([
@@ -89,7 +103,7 @@ signup = dbc.Container(
         ),
     ],
     style={
-        'height': '80vh',  # Full viewport height
+        'height': '80vh',
         'display': 'flex',
         'justifyContent': 'center',
         'alignItems': 'center',
@@ -97,6 +111,9 @@ signup = dbc.Container(
     },
     fluid=True,
 )
+
+# Define the layout for the user confirmation page (empty for now)
+userconfirm = dbc.Container([], fluid=True)
 
 @callback(
     Output('email-alert', 'is_open', allow_duplicate=True),
@@ -118,18 +135,16 @@ def signup_user(name, email, password, user_store, n_clicks):
     msg_email = ''
     msg_password = ''
 
-    # Validate email
     if email is None or '@gmail.com' in email or '@hotmail.com' in email:
         alert_open_email = True
-        msg_email = 'Invalid email, Gmail and Hotmail not permitted domains'
+        msg_email = 'Invalid email, Gmail and Hotmail not permitted'
         email_class = 'is-invalid'
     else:
         email_class = 'is-valid'
 
-    # Validate password
     if password is None or len(password) < 3:
         alert_open_password = True
-        msg_password = 'Invalid password (minimum 3 characters)'
+        msg_password = 'Password too short'
         password_class = 'is-invalid'
     else:
         password_class = 'is-valid'
@@ -137,8 +152,7 @@ def signup_user(name, email, password, user_store, n_clicks):
     if alert_open_email or alert_open_password:
         return alert_open_email, msg_email, email_class, alert_open_password, msg_password, password_class
 
-    # Create the users' database if it does not exist
-    DB_PATH = os.path.join(user_store['folder'], 'pages/accounts/users.db')
+    DB_PATH = os.path.join('pages/accounts/users.db')
     if not os.path.isfile(DB_PATH):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -152,27 +166,24 @@ def signup_user(name, email, password, user_store, n_clicks):
         conn.commit()
         conn.close()
 
-    # Check if the user already exists
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM users WHERE username = ?', (email,))
     if cursor.fetchone() is not None:
         conn.close()
         alert_open_email = True
-        msg_email = 'Email already taken, try another'
+        msg_email = 'Email already taken'
         return alert_open_email, msg_email, email_class, alert_open_password, msg_password, password_class
 
-    # Add a new user to the database
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (email, hashed_password.decode('utf-8')))
     conn.commit()
     conn.close()
 
-    # Create user folder and copy template files
     user_folder = os.path.join('pages/accounts', email)
+    print(f"Created user directory: {user_folder}")
     os.makedirs(user_folder, exist_ok=True)
 
-    # Create defaults folder and copy files from Template
     defaults_folder = os.path.join(user_folder, 'defaults')
     os.makedirs(defaults_folder, exist_ok=True)
     
@@ -181,14 +192,17 @@ def signup_user(name, email, password, user_store, n_clicks):
         source_file = os.path.join(template_folder, item)
         shutil.copy(source_file, defaults_folder)
 
-    return False, '', '', False, '', ''  # Reset alerts after successful signup
+    return False, '', '', False, '', ''  
+
 
 @callback(
     Output('login-email-alert', 'is_open', allow_duplicate=True),
     Output('login-email-alert', 'children', allow_duplicate=True),
     Output('login-password-alert', 'is_open', allow_duplicate=True),
     Output('login-password-alert', 'children', allow_duplicate=True),
-    Output('url', 'pathname'),  # Add this line for redirection
+    Output('user-store', 'data', allow_duplicate=True),  # Store user data
+    Output('navbar', 'style', allow_duplicate=True),
+    Output('url', 'href', allow_duplicate=True),  # Update the URL for redirection
     State('login-email', 'value'),
     State('login-password', 'value'),
     Input('login-button', 'n_clicks'),
@@ -196,15 +210,14 @@ def signup_user(name, email, password, user_store, n_clicks):
 )
 def login_user(email, password, n_clicks):
     if n_clicks is None or n_clicks == 0:
-        return False, '', False, '', no_update  # No action if button hasn't been clicked
+        return False, '', False, '', no_update, no_update, no_update  # No alerts and no redirection
 
     alert_open_email = False
     alert_open_password = False
     msg_email = ''
     msg_password = ''
 
-    # Logic to verify the user credentials
-    DB_PATH = os.path.join(user_store['folder'], 'pages/accounts/users.db')
+    DB_PATH = os.path.join('pages/accounts/users.db')
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('SELECT password FROM users WHERE username = ?', (email,))
@@ -220,9 +233,18 @@ def login_user(email, password, n_clicks):
         alert_open_password = True
         msg_password = 'Invalid password'
     else:
-        # Successful login, redirect to project page
-        return False, '', False, '', '/project'  # Redirect to project page
+        # Successfully logged in
+        user_folder = os.path.join('pages/accounts', email)
+        projects = []
+
+        if os.path.exists(user_folder):
+            projects = [f for f in os.listdir(user_folder) if os.path.isdir(os.path.join(user_folder, f))]
+
+        # Store user data here if needed (using dcc.Store or session management)
+        user_data = {'username': email, 'logged_in': True}
+
+        # Return the redirection to '/project'
+        return False, '', False, '', user_data, {'display': 'block'}, '/management'
 
     conn.close()
-
-    return alert_open_email, msg_email, alert_open_password, msg_password, no_update  # Return no update for pathname
+    return alert_open_email, msg_email, alert_open_password, msg_password, no_update, no_update, no_update  # No redirection if login fails
