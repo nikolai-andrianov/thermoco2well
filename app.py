@@ -81,11 +81,11 @@ navbar = dbc.Navbar(
 )
 def update_navbar(user_data):
     if user_data and user_data.get('logged_in', False):
-        # If logged in, show the "Management" link and "Logout" button, hide "Sign in"
+        # If logged in, show the "Logout" button, hide "Sign in"
         nav_login_style = {'display': 'none'}
         logout_style = {'display': 'block'}
     else:
-        # If not logged in, hide the "Management" link, show "Sign in" link and "Logout" button hidden
+        # If not logged in, hide "Logout" button
         nav_login_style = {'display': 'block'}
         logout_style = {'display': 'none'}
 
@@ -137,6 +137,7 @@ data = {
 # Display the pages in the content div
 content = html.Div(dash.page_container, id="page-content", style=CONTENT_STYLE)
 
+# Register /management page - used to create and delete projects
 dash.register_page(__name__, path='/management')  # Register management page
 from pages.management import layout as management
 
@@ -149,18 +150,7 @@ app.layout = html.Div([
     html.Div(id='user-status', style={'textAlign': 'right', 'padding': '10px'}),
 ])
 
-# we use a callback to toggle the collapse on small screens
-def toggle_navbar_collapse(n, is_open):
-    if n:
-        return not is_open
-    return is_open
-
-app.callback(
-    Output(f"navbar-collapse", "is_open"),
-    [Input(f"navbar-toggler", "n_clicks")],
-    [State(f"navbar-collapse", "is_open")],
-)(toggle_navbar_collapse)
-
+# Display logout button if user is logged in
 @app.callback(
     Output("logout-button", "style"),
     Input("user-store", "data")
@@ -170,6 +160,7 @@ def toggle_logout_button(user_data):
         return {'display': 'inline-block'}
     return {'display': 'none'}
 
+# If user presses the logout button they are logged out and returned to the /login page
 @app.callback(
     Output("user-store", "data", allow_duplicate=True),
     Output("url", "pathname"),
@@ -227,7 +218,6 @@ def render_page_content(pathname, user_data):
     elif pathname == "/signup":
         return navbar_non_visible, signup  # Keep signup page rendering
     elif pathname == "/management":
-        # Render management page layout here
         return navbar_style, management
 
     # If the user tries to reach a different page, return a 404 message
@@ -241,6 +231,7 @@ def render_page_content(pathname, user_data):
     )
 
 # Callback to update the user status display and print user directory
+# Serves as debugging and shows if a user is logged in or not in a text towards the bottom right of each page
 @app.callback(
     Output('user-status', 'children'),
     Input('user-store', 'data')
