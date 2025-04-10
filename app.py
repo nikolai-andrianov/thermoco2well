@@ -26,13 +26,15 @@ app = Dash(__name__,
 app.title = "THERMOCO2WELL"
 
 # Items for the navigation bar
-nav_project = dbc.NavItem(dbc.NavLink("Project", href="/project", active="exact"))
+nav_project = dbc.NavItem(dbc.NavLink("Project", href="/project", active="exact", id="nav-project"))
 nav_blog = dbc.NavItem(dbc.NavLink("Blog", href="/blog", active="exact"))
 nav_about = dbc.NavItem(dbc.NavLink("About", href="/about", active="exact"))
 nav_login = dbc.NavItem(dbc.NavLink("Sign in", href="/login", active="exact", 
                                     style={"border":"2px grey solid", 'borderRadius': '5px'},
                                     id="nav-login"
                                     ))
+nav_management = dbc.NavItem(dbc.NavLink("Management", href="/management", active="exact", id="nav-management"))
+
 
 nav_logout = dbc.NavItem(
     dbc.Button("Logout", id="logout-button", color="danger", className="ms-2", n_clicks=0, style={'display': 'none'})
@@ -55,7 +57,7 @@ navbar = dbc.Navbar(
             dbc.NavbarToggler(id="navbar-toggler", n_clicks=0),
             dbc.Collapse(
                 dbc.Nav(
-                    [nav_project, nav_blog, nav_about, nav_login, nav_logout],
+                    [nav_project, nav_management, nav_blog, nav_about, nav_login, nav_logout],
                     className="ms-auto",
                     navbar=True,
                 ),
@@ -70,11 +72,15 @@ navbar = dbc.Navbar(
     style={'display': 'block'},
 )
 
+
 # Callback to update the navbar links based on login status
+# Management and Project pages are not visible or accessible to the user unless logged in
 @app.callback(
     [
         Output('nav-login', 'style'),
-        Output('logout-button', 'style', allow_duplicate=True)
+        Output('logout-button', 'style', allow_duplicate=True),
+        Output('nav-management', 'style', allow_duplicate=True),
+        Output('nav-project', 'style', allow_duplicate=True)  # Add this line to control project visibility
     ],
     Input('user-store', 'data'),  # Get user data to check login status
     prevent_initial_call=True  # Prevent the initial callback when the app starts
@@ -84,13 +90,19 @@ def update_navbar(user_data):
         # If logged in, show the "Logout" button, hide "Sign in"
         nav_login_style = {'display': 'none'}
         logout_style = {'display': 'block'}
+        management_style = {'display': 'block'}  # Show Management link
+        project_style = {'display': 'block'}  # Show Project link
     else:
-        # If not logged in, hide "Logout" button
+        # If not logged in, hide "Logout" button, "Management", and "Project" links
         nav_login_style = {'display': 'block'}
         logout_style = {'display': 'none'}
+        management_style = {'display': 'none'}  # Hide Management link
+        project_style = {'display': 'none'}  # Hide Project link
 
     # Return updated navbar with the correct visibility of the links
-    return nav_login_style, logout_style
+    return nav_login_style, logout_style, management_style, project_style
+
+
 
 # Define the project page
 from pages.project.layout import tab_input, tab_results
@@ -180,15 +192,11 @@ def logout(n_clicks, user_data):
     Input('user-store', 'data'),  # Check user status
 )
 def render_page_content(pathname, user_data):
-    print(f"Pathname: {pathname}")  # Debugging print
-    print(f"User data: {user_data}")  # Debugging print
-    
     navbar_visible = {'display': 'block'}
     navbar_non_visible = {'display': 'none'}
 
     # Check if user is logged in
     logged_in = user_data.get('logged_in', False)
-    print(f"Is user logged in? {logged_in}")  # Debugging print
 
     # Always show navbar except on login and signup pages
     if pathname in ["/login", "/signup"]:
@@ -196,12 +204,21 @@ def render_page_content(pathname, user_data):
     else:
         navbar_style = navbar_visible
 
-    # If the pathname is '/management', we want to print the username
+    # If the user is not logged in and tries to access /management or /project, redirect to login
+    if pathname == "/management" and not logged_in:
+        return navbar_style, dcc.Location(url="/login", id="redirect-to-login")
+    
+    if pathname == "/project" and not logged_in:
+        return navbar_style, dcc.Location(url="/login", id="redirect-to-login")
+
+    # If the pathname is '/management' or '/project', we want to print the username
     if pathname == "/management":
-        # Print the user's name to the terminal
         username = user_data.get('username', 'Not logged in')  # Get username or a default
         print(f"Loading management page for user: {username}")  # This should print now!
-        
+
+    if pathname == "/project":
+        print(f"Loading project page for user: {user_data.get('username', 'Not logged in')}")
+
     # Render the appropriate page content based on the pathname
     if pathname == "/":
         return navbar_style, blog
@@ -229,6 +246,7 @@ def render_page_content(pathname, user_data):
         ],
         className="p-3 bg-light rounded-3",
     )
+
 
 # Callback to update the user status display and print user directory
 # Serves as debugging and shows if a user is logged in or not in a text towards the bottom right of each page

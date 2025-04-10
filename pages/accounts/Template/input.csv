@@ -1,5 +1,5 @@
 Property,Variable,Value,Unit
-Well measured depth,D,2000,m
+Well measured depth,D,1588,m
 Inclination from horizontal,phi,270,deg
 Tubing inner radius,r_ti,3.1,cm
 Tubing outer radius,r_to,3.65,cm

@@ -5,6 +5,7 @@ import os
 import shutil
 
 # Define base accounts folder
+# Template folder contains the default values and it's contents are copied to every new project folder
 ACCOUNTS_FOLDER = "./pages/accounts"
 TEMPLATE_FOLDER = os.path.join(ACCOUNTS_FOLDER, "Template")
 
@@ -19,7 +20,7 @@ layout = html.Div([
     html.P("Here you can manage your projects."),
 
     # Centered buttons for project management
-    html.Div([
+    html.Div([  
         html.Button(
             [html.I(className="fa-solid fa-eye"), " See My Projects"], 
             id="see-my-projects-button", 
@@ -43,12 +44,20 @@ layout = html.Div([
             html.H4("Add New Project", style={"font-weight": "bold", "color": "black", "textAlign": "center"})
         ),
         dbc.ModalBody([ 
-            # Input box centered
+            # Input box for project name
             dcc.Input(
                 id="new-project-name", 
                 type="text", 
                 placeholder="Enter new project name", 
                 style={"display": "block", "margin": "0 auto", "width": "80%", "textAlign": "center"}
+            ),
+            # Input box for project description
+            # This allows the user to provide a description of a project
+            # This is later saved in a txt file in each project folder to be then read and displayed in the project cards
+            dcc.Textarea(
+                id="new-project-description", 
+                placeholder="Enter project description (optional)", 
+                style={"display": "block", "margin": "0 auto", "width": "80%", "textAlign": "center", "height": "100px"}
             ),
             # Red message for empty input
             html.Div(id="input-error-message", children="", style={"color": "red", "textAlign": "center", "marginTop": "10px"}),
@@ -66,8 +75,6 @@ layout = html.Div([
 ])
 
 # Callback to manage project actions (add, see, delete)
-# Cards are generated for each project
-# Each card has open and delete buttons
 @callback(
     Output("projects-list", "children"),
     Output("new-project-modal", "is_open"),
@@ -77,11 +84,12 @@ layout = html.Div([
     Input("confirm-new-project", "n_clicks"),
     Input({"type": "project-delete-button", "index": dash.ALL}, "n_clicks"),
     State("new-project-name", "value"),
+    State("new-project-description", "value"),  # Capture project description
     State("new-project-modal", "is_open"),
     State("user-store", "data"),
     prevent_initial_call=True,
 )
-def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_project_name, modal_open, user_data):
+def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_project_name, new_project_description, modal_open, user_data):
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update, dash.no_update, dash.no_update
@@ -98,10 +106,31 @@ def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_p
         project_cards = []
 
         for i, project in enumerate(projects):
+            # Reading the project description from the text file
+            description = ""
+            description_path = os.path.join(user_folder, project, "description.txt")
+            if os.path.exists(description_path):
+                with open(description_path, "r") as desc_file:
+                    description = desc_file.read()
+
+            # Checks if the project is the 'defaults' folder
+            # If the project is defaults, no delete button is present
+            delete_button = None
+            if project != "defaults":
+                delete_button = dbc.Button(
+                    [html.I(className="fa-solid fa-trash", style={"color": "red"}), " Delete"],
+                    id={"type": "project-delete-button", "index": project},
+                    color="secondary",  # Grey button color
+                    outline=True,
+                    style={"color": "black", "border": "1px solid black", "font-weight": "bold"},
+                    n_clicks=0
+                )
+
             project_card = dbc.Card(
                 dbc.CardBody([ 
                     html.H5(project, className="card-title", style={"font-weight": "bold", "text-decoration": "underline"}),
-
+                    html.P(description, style={"font-style": "italic", "color": "gray"}),  # Display description below the title
+                    
                     # Wrap the buttons in a div with Flexbox classes
                     html.Div(
                         [
@@ -117,19 +146,12 @@ def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_p
                                 n_clicks=0
                             ),
                             
-                            # Delete Button (Right aligned)
-                            dbc.Button(
-                                [html.I(className="fa-solid fa-trash", style={"color": "red"}), " Delete"],
-                                id={"type": "project-delete-button", "index": project},
-                                color="secondary",  # Grey button color
-                                outline=True,
-                                style={"color": "black", "border": "1px solid black", "font-weight": "bold"},
-                                n_clicks=0
-                            ),
+                            # If the delete button is not None, add it
+                            delete_button,
                         ],
                         className="d-flex justify-content-between"  # Align buttons on opposite sides
                     ),
-                ]),
+                ]), 
                 style={"background-color": "white", "border": "1px solid black", "cursor": "pointer"},
             )
 
@@ -145,42 +167,37 @@ def manage_projects(see_clicks, add_clicks, confirm_clicks, delete_clicks, new_p
         if not new_project_name:
             return dash.no_update, True, "Please enter a name for your project"
         
-        create_project(user_folder, new_project_name)
+        # Allow project description to be empty to avoid errors
+        # Makes the project description optional
+        create_project(user_folder, new_project_name, new_project_description or "")  # Pass empty string if no description
         return dash.no_update, False, dash.no_update
 
     # Handle Delete button clicks
     if "project-delete-button" in button_id:
         try:
-            # Fix: Extract the project name from the button ID, clean the string
-            # Instead of splitting incorrectly, clean the string from any additional characters
             project_to_delete = button_id.split(":")[1]  # Extract project name from button ID
-            project_name = project_to_delete.replace('","type', '').replace('"', '').strip()  # Remove any extraneous parts like ","type and quotes
+            project_name = project_to_delete.replace('","type', '').replace('"', '').strip()  # Clean up the project name
 
-            # Construct the full path to the project folder
             project_path = os.path.join(user_folder, project_name)
-
-            # Normalize the project path to ensure correct formatting of slashes
             project_path = os.path.normpath(project_path)
 
-            # Debugging output
-            print(f"Attempting to delete project: {project_name} at {project_path}")
-
-            # Check if the project folder exists and delete it
             if os.path.exists(project_path):
-                shutil.rmtree(project_path)  # Delete the project folder and its contents
-                print(f"Successfully deleted project: {project_name} at {project_path}")
+                shutil.rmtree(project_path)
+                print(f"Successfully deleted project: {project_name}")
             else:
                 print(f"Project not found at {project_path}")
 
         except Exception as e:
             print(f"Error during deletion: {e}")
 
-        # Refresh the project list after deletion
         return dash.no_update, dash.no_update, dash.no_update
 
     return dash.no_update, dash.no_update, dash.no_update
 
+
+
 # Callback to handle "Open" button click and print project name and folder path in terminal
+# May require updates as it is a 'messy' process to obtain the correct file directory
 @callback(
     Output("projects-list", "children", allow_duplicate=True),
     Input({"type": "project-open-button", "index": dash.ALL}, "n_clicks"),
@@ -195,7 +212,7 @@ def handle_project_click(n_clicks, user_data):
         try:
             # Extract only the part of the ID that corresponds to the project name
             # The format is {"type": "project-open-button", "index": "p1"} (or similar)
-            # We're only interested in the "index" part, so we'll split the string appropriately
+            # Only concerned in the "index" part, so split the string appropriately
             project_name = triggered_id.split('"')[3].strip()  # This extracts the value of the "index" field
 
             # Get the logged-in user email
@@ -245,14 +262,24 @@ def get_user_projects(user_folder):
     print(f"Existing Projects for {user_folder}: {projects}")  # Debugging
     return projects
 
-def create_project(user_folder, project_name):
+
+# Create New Project
+# The Add New Project Button allows the user to create a new project folder within the user's specific directory
+# This new project has all the files from the template folder
+# The 'description.txt' file is saved containing the user-defined description of the project in question
+def create_project(user_folder, project_name, project_description):
     """Create a new project directory in the logged-in user's folder and copy template files."""
     project_path = os.path.join(user_folder, project_name)
     if not os.path.exists(project_path):
         os.makedirs(project_path)
-        print(f"Created Project Folder: {project_path}")  # Debugging
+        print(f"Created Project Folder: {project_path}") 
         
-        # Copy template files
+        # Create the description file
+        description_path = os.path.join(project_path, "description.txt")
+        with open(description_path, "w") as desc_file:
+            desc_file.write(project_description)
+        print(f"Description saved to: {description_path}")
+        
         if os.path.exists(TEMPLATE_FOLDER):
             for item in os.listdir(TEMPLATE_FOLDER):
                 src_path = os.path.join(TEMPLATE_FOLDER, item)
@@ -261,4 +288,4 @@ def create_project(user_folder, project_name):
                     shutil.copytree(src_path, dest_path)
                 else:
                     shutil.copy2(src_path, dest_path)
-            print(f"Copied template files to: {project_path}")  # Debugging
+            print(f"Copied template files to: {project_path}")

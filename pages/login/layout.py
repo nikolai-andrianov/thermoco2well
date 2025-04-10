@@ -112,9 +112,7 @@ signup = dbc.Container(
     fluid=True,
 )
 
-# Define the layout for the user confirmation page (empty for now)
-userconfirm = dbc.Container([], fluid=True)
-
+# Signup user function
 @callback(
     Output('email-alert', 'is_open', allow_duplicate=True),
     Output('email-alert', 'children', allow_duplicate=True),
@@ -194,7 +192,8 @@ def signup_user(name, email, password, user_store, n_clicks):
 
     return False, '', '', False, '', ''  
 
-
+# Login user function
+# Upon successful login, user redirected to /management
 @callback(
     Output('login-email-alert', 'is_open', allow_duplicate=True),
     Output('login-email-alert', 'children', allow_duplicate=True),
@@ -243,7 +242,7 @@ def login_user(email, password, n_clicks):
         # Store user data here if needed (using dcc.Store or session management)
         user_data = {'username': email, 'logged_in': True}
 
-        # Return the redirection to '/project'
+        # Return the redirection to '/management'
         return False, '', False, '', user_data, {'display': 'block'}, '/management'
 
     conn.close()
