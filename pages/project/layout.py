@@ -94,7 +94,7 @@ buttons = html.Div(
         dcc.Download(id="download-results"),
         dbc.Alert("Modified input parameters saved", id="save-button-alert", is_open=False, dismissable=True),
         dbc.Alert("Simulation results are available in the Results tab", id="run-button-alert", is_open=False, dismissable=True),
-        dbc.Alert("Missing project name. Please select a project before saving inputs and running simulations", id="error-alert", is_open=False, color="danger", dismissable=True),  # 🔴 NEW ALERT
+        dbc.Alert("Missing project name. Please select a project before saving inputs and running simulations", id="error-alert", is_open=False, color="danger", dismissable=True),
     ]
 )
 
