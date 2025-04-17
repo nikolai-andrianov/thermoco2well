@@ -94,6 +94,7 @@ buttons = html.Div(
         dcc.Download(id="download-results"),
         dbc.Alert("Modified input parameters saved", id="save-button-alert", is_open=False, dismissable=True),
         dbc.Alert("Simulation results are available in the Results tab", id="run-button-alert", is_open=False, dismissable=True),
+        dbc.Alert("Missing project name. Please select a project before saving inputs and running simulations", id="error-alert", is_open=False, color="danger", dismissable=True),  # 🔴 NEW ALERT
     ]
 )
 
@@ -144,6 +145,7 @@ def on_modified_input(cell_changed):
     Output("save-button-alert", "is_open"), 
     Output("save-button", "disabled"), 
     Output("run-button", "disabled"),
+    Output("error-alert", "is_open", allow_duplicate=True),
     Input("input-grid", "rowData"), 
     Input("save-button", "n_clicks"),
     State("save-button-alert", "is_open"),
@@ -159,8 +161,8 @@ def on_save_button_click(data, n, is_open, search, user_data):
         user_email = user_data.get("username")
 
         if not project_name or not user_email:
-            print("Missing project name or user not logged in.")
-            raise PreventUpdate
+            print("Missing project name. Please select a project before saving inputs and running simulations")
+            return False, dash.no_update, dash.no_update, True
 
         # Construct the project folder path
         user_folder = os.path.join(ACCOUNTS_FOLDER, user_email)
@@ -174,7 +176,7 @@ def on_save_button_click(data, n, is_open, search, user_data):
         updated_input.to_csv(input_csv_path, index=False) 
 
         # Return alert visibility and button states
-        return not is_open, True, False  # Close alert, disable Save, enable Run button
+        return not is_open, True, False, False  # Close alert, disable Save, enable Run button
        
 
 
@@ -201,7 +203,7 @@ def on_load_button_click(n, search, user_data):
         user_email = user_data.get("username")
 
         if not project_name or not user_email:
-            print("Missing project name or user not logged in.")
+            print("Missing project name. Please select a project before saving inputs and running simulations")
             return default_data.to_dict("records"), True, False
 
         # Construct the path to the project folder
@@ -230,6 +232,7 @@ def on_load_button_click(n, search, user_data):
     Output("id_tab_results", "children"),
     Output("run-button-alert", "is_open"),
     Output("id_tab_results", "disabled"), 
+    Output("error-alert", "is_open"),
     Input("run-button", "n_clicks"),
     State("run-button-alert", "is_open"),
     State("url", "search"),  # Get project details from URL
@@ -268,8 +271,8 @@ def on_run_button_click(set_progress, n, is_open, search, user_data):
         user_email = user_data.get("username")
 
         if not project_name or not user_email:
-            print("Missing project name or user not logged in.")
-            raise PreventUpdate
+            print("Missing project name. Please select a project before saving inputs and running simulations")
+            return dash.no_update, False, dash.no_update, True
 
         # Step #2: Construct the project folder path
         user_folder = os.path.join(ACCOUNTS_FOLDER, user_email)
@@ -330,7 +333,7 @@ def on_run_button_click(set_progress, n, is_open, search, user_data):
         set_progress((str(3), str(total), 'Done!'))
     
         # Return the generated graphs, show the alert, and activate the Results tab        
-        return graphs, not is_open, False
+        return graphs, not is_open, False, dash.no_update
 
 
 # Callback to load project data into the grid based on URL change
@@ -410,7 +413,7 @@ def download_results(n_clicks, search, user_data):
     user_email = user_data.get("username")
 
     if not project_name or not user_email:
-        print("Missing project name or user not logged in.")
+        print("Missing project name. Please select a project before saving inputs and running simulations")
         raise PreventUpdate
 
     # Construct the path to the results.csv file
@@ -448,7 +451,7 @@ def handle_upload(contents, filename, search, user_data):
     user_email = user_data.get("username")
 
     if not project_name or not user_email:
-        print("Missing project name or user not logged in.")
+        print("Missing project name. Please select a project before saving inputs and running simulations")
         raise PreventUpdate
 
     # Decode the uploaded file
