@@ -94,7 +94,8 @@ buttons = html.Div(
         dcc.Download(id="download-results"),
         dbc.Alert("Modified input parameters saved", id="save-button-alert", is_open=False, dismissable=True),
         dbc.Alert("Simulation results are available in the Results tab", id="run-button-alert", is_open=False, dismissable=True),
-        dbc.Alert("Missing project name. Please select a project before saving inputs and running simulations", id="error-alert", is_open=False, color="danger", dismissable=True),
+        dbc.Alert("Missing project name. Please select a project before saving inputs and running simulations", id="error-alert", is_open=False, color="danger", dismissable=True),  
+        
     ]
 )
 
@@ -398,6 +399,7 @@ def load_project_data_from_url(search, user_data):
 # Looks for the results.csv file in the project folder and downloads it
 @callback(
     Output("download-results", "data"),
+    Output("error-alert", "is_open", allow_duplicate=True),
     Input("download-button", "n_clicks"),
     State("url", "search"),  # Get the URL parameters to identify the project
     State("user-store", "data"),  # Get logged-in user's details
@@ -414,7 +416,7 @@ def download_results(n_clicks, search, user_data):
 
     if not project_name or not user_email:
         print("Missing project name. Please select a project before saving inputs and running simulations")
-        raise PreventUpdate
+        return dash.no_update, True
 
     # Construct the path to the results.csv file
     user_folder = os.path.join(ACCOUNTS_FOLDER, user_email)
@@ -424,17 +426,17 @@ def download_results(n_clicks, search, user_data):
     # Check if the file exists and serve it for download
     if os.path.exists(results_csv_path):
         print(f"Preparing to download: {results_csv_path}")
-        return send_file(results_csv_path)
+        return send_file(results_csv_path), False
     else:
         print(f"File not found: {results_csv_path}")
-        raise PreventUpdate
-
+        return dash.no_update, True
 
 
 # Callback to handle the file upload and process it
 # An upload button so that a user can upload a file which is then saved to a project folder
 @callback(
     Output("input-grid", "rowData"),  # Update the grid with the uploaded file data
+    Output("error-alert", "is_open", allow_duplicate=True),
     Input('upload-data', 'contents'),
     State('upload-data', 'filename'),
     State("url", "search"),
@@ -452,7 +454,7 @@ def handle_upload(contents, filename, search, user_data):
 
     if not project_name or not user_email:
         print("Missing project name. Please select a project before saving inputs and running simulations")
-        raise PreventUpdate
+        return dash.no_update, True
 
     # Decode the uploaded file
     content_type, content_string = contents.split(',')
@@ -468,7 +470,7 @@ def handle_upload(contents, filename, search, user_data):
     df.to_csv(uploaded_file_path, index=False)
 
     # Return the uploaded data to be displayed in the grid
-    return df.to_dict("records")
+    return df.to_dict("records"), False
 
 layout = html.Div([
     dcc.Location(id="url", refresh=False),
