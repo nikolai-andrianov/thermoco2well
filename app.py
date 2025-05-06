@@ -132,7 +132,7 @@ with open(os.path.join(folder, 'pages/about.md'), 'r') as file:
    about = file.read()
 
 # Define the login and signup pages
-from pages.login.layout import *
+from pages.login.layout import login, signup
 
 # Padding to match the one in the navbar
 CONTENT_STYLE = {
@@ -150,17 +150,18 @@ data = {
 content = html.Div(dash.page_container, id="page-content", style=CONTENT_STYLE)
 
 # Register /management page - used to create and delete projects
-dash.register_page(__name__, path='/management')  # Register management page
 from pages.management import layout as management
 
 # The layout consists of the navigation bar at the top, and the pages' content below 
-app.layout = html.Div([
+layout = html.Div([
     dcc.Store(id='user-store', data=data, storage_type="local"),  # Initialize user store
     dcc.Location(id="url", refresh=True),
     navbar, 
     content,
     html.Div(id='user-status', style={'textAlign': 'right', 'padding': '10px'}),
 ])
+
+app.layout = layout
 
 # Display logout button if user is logged in
 @app.callback(
@@ -231,9 +232,9 @@ def render_page_content(pathname, user_data):
     elif pathname == "/about":
         return navbar_style, dcc.Markdown(about, dangerously_allow_html=True)
     elif pathname == "/login":
-        return navbar_non_visible, login  # Keep login page rendering
+        return navbar_non_visible, login
     elif pathname == "/signup":
-        return navbar_non_visible, signup  # Keep signup page rendering
+        return navbar_non_visible, signup
     elif pathname == "/management":
         return navbar_style, management
 
@@ -259,7 +260,7 @@ def update_user_status(user_data):
     
     if username:
         # Correct path to the user directory under 'accounts' folder
-        user_directory = os.path.join(os.path.dirname(__file__), '..', 'accounts', username)
+        user_directory = os.path.join(os.path.dirname(__file__), 'accounts', username)
         
         # Ensure the path is absolute
         user_directory = os.path.abspath(user_directory)
