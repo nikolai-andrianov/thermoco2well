@@ -120,6 +120,9 @@ signup = dbc.Container(
     Output('password-alert', 'is_open', allow_duplicate=True),
     Output('password-alert', 'children', allow_duplicate=True),
     Output('signup-password', 'className', allow_duplicate=True),
+    Output('user-store', 'data', allow_duplicate=True),
+    Output('navbar', 'style', allow_duplicate=True),
+    Output('url', 'href', allow_duplicate=True),
     State('signup-name', 'value'),
     State('signup-email', 'value'),
     State('signup-password', 'value'),
@@ -128,19 +131,22 @@ signup = dbc.Container(
     prevent_initial_call=True,
 )
 def signup_user(name, email, password, user_store, n_clicks):
+    if not all([name, email, password]):
+        return no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+
     alert_open_email = False
     alert_open_password = False
     msg_email = ''
     msg_password = ''
 
-    if email is None or '@gmail.com' in email or '@hotmail.com' in email:
+    if '@gmail.com' in email or '@hotmail.com' in email:
         alert_open_email = True
         msg_email = 'Invalid email, Gmail and Hotmail not permitted'
         email_class = 'is-invalid'
     else:
         email_class = 'is-valid'
 
-    if password is None or len(password) < 3:
+    if len(password) < 3:
         alert_open_password = True
         msg_password = 'Password too short'
         password_class = 'is-invalid'
@@ -148,7 +154,7 @@ def signup_user(name, email, password, user_store, n_clicks):
         password_class = 'is-valid'
 
     if alert_open_email or alert_open_password:
-        return alert_open_email, msg_email, email_class, alert_open_password, msg_password, password_class
+        return alert_open_email, msg_email, email_class, alert_open_password, msg_password, password_class, no_update, no_update, no_update
 
     DB_PATH = os.path.join('pages/accounts/users.db')
     if not os.path.isfile(DB_PATH):
@@ -171,7 +177,7 @@ def signup_user(name, email, password, user_store, n_clicks):
         conn.close()
         alert_open_email = True
         msg_email = 'Email already taken'
-        return alert_open_email, msg_email, email_class, alert_open_password, msg_password, password_class
+        return alert_open_email, msg_email, email_class, alert_open_password, msg_password, password_class, no_update, no_update, no_update
 
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (email, hashed_password.decode('utf-8')))
@@ -184,13 +190,15 @@ def signup_user(name, email, password, user_store, n_clicks):
 
     defaults_folder = os.path.join(user_folder, 'defaults')
     os.makedirs(defaults_folder, exist_ok=True)
-    
+
     template_folder = os.path.join('pages/accounts/Template')
     for item in os.listdir(template_folder):
         source_file = os.path.join(template_folder, item)
         shutil.copy(source_file, defaults_folder)
 
-    return False, '', '', False, '', ''  
+    user_data = {'username': email, 'logged_in': True}
+    return False, '', '', False, '', '', user_data, {'display': 'block'}, '/management'
+
 
 # Login user function
 # Upon successful login, user redirected to /management
